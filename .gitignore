@@ -1,0 +1,6 @@
+.DS_Store
+.sf/
+.sfdx/
+force-app/
+node_modules/
+*.log
