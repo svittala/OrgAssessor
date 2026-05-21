@@ -4,3 +4,12 @@
 force-app/
 node_modules/
 *.log
+
+# Org analysis — generated output files (per-org, not committed)
+reports/organalysis/inventory.json
+reports/organalysis/analysis.json
+reports/organalysis/capability-matrix-*.html
+reports/organalysis/domains.config.backup.json
+# Keep the reports folder itself and any hand-edited configs
+!reports/organalysis/
+!reports/organalysis/domains.config.json
