@@ -10,14 +10,14 @@
 #   Pass 1 — Recommended rules against all component types
 #            (Apex, Triggers, VF Pages, Aura, LWC, Flows)
 #   Pass 2 — Adds SFGE (Graph Engine / data-flow) rules for Apex & Triggers
-#   Summary — Calls parse-results.py to print a violation breakdown
+#   Summary — Calls parse-results.js to print a violation breakdown
 #
 # Outputs (all written to reports/):
 #   code-analysis.html           — Pass 1 full report (browser-readable)
 #   code-analysis.csv            — Pass 1 raw data (filterable in Excel)
 #   code-analysis-with-sfge.html — Pass 2 report (Apex + SFGE)
 #   code-analysis-with-sfge.csv  — Pass 2 raw data
-#   code-analysis-summary.txt    — Combined summary from parse-results.py
+#   code-analysis-summary.txt    — Combined summary from parse-results.js
 # =============================================================================
 
 set -euo pipefail
@@ -45,7 +45,7 @@ if ! command -v sf &>/dev/null; then
     exit 1
 fi
 
-SF_VERSION=$(sf version --json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('cliVersion','?'))" 2>/dev/null || echo "unknown")
+SF_VERSION=$(sf version --json 2>/dev/null | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log((JSON.parse(d)||{}).cliVersion||'?'))" 2>/dev/null || echo "unknown")
 echo "    sf CLI: ${SF_VERSION}"
 
 if ! sf code-analyzer run --help &>/dev/null; then
@@ -57,12 +57,12 @@ fi
 CA_VERSION=$(sf plugins 2>/dev/null | grep "code-analyzer" | awk '{print $2}' || echo "unknown")
 echo "    code-analyzer plugin: ${CA_VERSION}"
 
-if ! command -v python3 &>/dev/null; then
-    echo "WARNING: python3 not found. Summary script will be skipped."
+if ! command -v node &>/dev/null; then
+    echo "WARNING: node not found. Summary script will be skipped."
     SKIP_SUMMARY=true
 else
     SKIP_SUMMARY=false
-    echo "    python3: $(python3 --version)"
+    echo "    node: $(node --version)"
 fi
 
 echo ""
@@ -125,7 +125,7 @@ echo ""
 # ── SUMMARY ───────────────────────────────────────────────────────────────────
 if [ "${SKIP_SUMMARY}" = "false" ]; then
     echo ">>> Generating summary..."
-    python3 scripts/code-analyzer/parse-results.py \
+    node scripts/code-analyzer/parse-results.js \
         --pass1 reports/code-analysis.csv \
         --pass2 reports/code-analysis-with-sfge.csv \
         --out   reports/code-analysis-summary.txt

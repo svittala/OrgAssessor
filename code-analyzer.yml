@@ -1,0 +1,14 @@
+engines:
+  eslint:
+    auto_discover_eslint_config: true
+    disable_javascript_base_config: true
+    disable_lwc_base_config: true
+    disable_typescript_base_config: true
+ignores:
+  files:
+    - "**/Test/**"
+    - "**/test/**"
+    - "**/*Test.cls"
+    - "**/__tests__/**"
+    - "**/__mocks__/**"
+log_level: info

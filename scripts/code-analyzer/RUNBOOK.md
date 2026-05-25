@@ -31,16 +31,12 @@ If not installed:
 sf plugins install code-analyzer
 ```
 
-### 3. Python 3 (for the summary script)
+### 3. Node.js and npm (already in the project — for running utility scripts, parsing summaries, and Prettier autofix)
 
 ```bash
-python3 --version
-# Expected: Python 3.9 or higher
-```
+node --version
+# Expected: Node.js 18.x or higher
 
-### 4. Node / npm (already in the project — for Prettier autofix)
-
-```bash
 npm --version
 ```
 
@@ -104,7 +100,7 @@ sf code-analyzer run \
 | `--target force-app/...` | Each `--target` adds a folder to scan; specify one per component type |
 | `--rule-selector Recommended` | Runs only rules tagged Recommended (best signal-to-noise for first run) |
 | `--output-file reports/code-analysis.html` | Self-contained HTML report — open directly in a browser |
-| `--output-file reports/code-analysis.csv` | Raw data — open in Excel or filter with Python |
+| `--output-file reports/code-analysis.csv` | Raw data — open in Excel or filter with Node.js/JavaScript |
 | `--view table` | Shows a concise table in the terminal while running |
 
 **Engines that fire automatically based on file type:**
@@ -167,7 +163,7 @@ sf code-analyzer run \
 ### Step 5 — Generate the text summary
 
 ```bash
-python3 scripts/code-analyzer/parse-results.py \
+node scripts/code-analyzer/parse-results.js \
   --pass1 reports/code-analysis.csv \
   --pass2 reports/code-analysis-with-sfge.csv \
   --out   reports/code-analysis-summary.txt
@@ -185,22 +181,17 @@ This prints a formatted summary to the terminal and saves it to
 
 ---
 ### Step 6 — Generate Profile and Permissionset analysis
+
 ```bash
-python3 scripts/code-analyzer/analyze_permissions.py \
+node scripts/code-analyzer/analyze-permissions.js
 ```
-This generates 2 files reports folder
-   - permission-analysis-results.csv and 
-   - permission-analysis-summary.csv
 
-This also prints a formatted summary to the terminal and saves it to
-`reports/permission-analysis-summary.txt`. It shows:
+This scans all profiles and permission sets in the project and generates 3 files in the `reports/` folder:
+- `permission-analysis-results.csv` (contains every individual finding)
+- `permission-analysis-summary.csv` (contains one row per profile/permission set with risk score)
+- `permission-analysis-summary.txt` (a human-readable ranked summary)
 
-- Combined totals (High, Moderate, Low, Info)
-- Breakdown by severity, engine, and component type
-- Top 15 rules by violation count
-- SFGE-specific findings isolated
-- Top 10 files by violation count
-- Prioritised remediation checklist
+It ranks profiles and permission sets by risk score, highlighting critical/high/medium-severity permission assignments and dangerous permission combinations (like `AuthorApex` + `ModifyAllData`).
 
 ### That is all the steps - you are done here 
 ## Understanding the Output
@@ -252,30 +243,40 @@ This also prints a formatted summary to the terminal and saves it to
 
 ---
 
-## Filtering the CSV with Python (quick one-liners)
+## Filtering the CSV with Node.js (quick one-liners)
 
 Show only High SFGE violations:
 ```bash
-python3 -c "
-import csv
-with open('reports/code-analysis-with-sfge.csv') as f:
-    rows = [r for r in csv.DictReader(f) if r['engine']=='sfge' and r['severity']=='2']
-print(f'{len(rows)} High SFGE violations')
-for r in rows:
-    print(f\"  {r['rule']}: {r['file'].split('/')[-1]}:{r['startLine']}\")
+node -e "
+const fs = require('fs');
+if (!fs.existsSync('reports/code-analysis-with-sfge.csv')) { console.log('File not found.'); process.exit(0); }
+const lines = fs.readFileSync('reports/code-analysis-with-sfge.csv', 'utf8').split('\n');
+const headers = lines[0].split(',').map(h => h.trim());
+const rows = lines.slice(1).filter(Boolean).map(line => {
+  const values = line.split(',');
+  return headers.reduce((acc, h, i) => { acc[h] = (values[i] || '').trim(); return acc; }, {});
+});
+const filtered = rows.filter(r => r.engine === 'sfge' && r.severity === '2');
+console.log(\`\${filtered.length} High SFGE violations\`);
+filtered.forEach(r => console.log(\`  \${r.rule}: \${(r.file || '').split('/').pop()}:\${r.startLine}\`));
 "
 ```
 
 Show violations by file for a specific class:
 ```bash
-python3 -c "
-import csv
-cls = 'FOIAExportController'
-with open('reports/code-analysis-with-sfge.csv') as f:
-    rows = [r for r in csv.DictReader(f) if cls in r['file']]
-print(f'{len(rows)} violations in {cls}')
-for r in rows:
-    print(f\"  [{r['engine']}] {r['rule']} (sev {r['severity']}) line {r['startLine']}\")
+node -e "
+const fs = require('fs');
+if (!fs.existsSync('reports/code-analysis-with-sfge.csv')) { console.log('File not found.'); process.exit(0); }
+const cls = 'FOIAExportController';
+const lines = fs.readFileSync('reports/code-analysis-with-sfge.csv', 'utf8').split('\n');
+const headers = lines[0].split(',').map(h => h.trim());
+const rows = lines.slice(1).filter(Boolean).map(line => {
+  const values = line.split(',');
+  return headers.reduce((acc, h, i) => { acc[h] = (values[i] || '').trim(); return acc; }, {});
+});
+const filtered = rows.filter(r => r.file && r.file.includes(cls));
+console.log(\`\${filtered.length} violations in \${cls}\`);
+filtered.forEach(r => console.log(\`  [\${r.engine}] \${r.rule} (sev \${r.severity}) line \${r.startLine}\`));
 "
 ```
 
